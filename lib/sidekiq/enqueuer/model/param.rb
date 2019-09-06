@@ -1,0 +1,41 @@
+module Sidekiq
+  module Enqueuer
+    module Model
+      class Param
+        class NoProvidedValueForRequiredParam < StandardError; end
+        attr_accessor :name, :is_required
+        def initialize name, label
+          @name = name
+          @is_required = (label == :req)
+        end
+
+        class << self
+          def check_params request_params, params
+            results = {}
+            params.map do |param|
+              result = request_params[param.name.to_s] || ''
+              result = convert_to_appropriate_datatype(result)
+              raise NoProvidedValueForRequiredParam if param.is_required && result.blank?
+              results[param.name] = result
+            end
+          end
+
+          private
+          def convert_to_appropriate_datatype str
+            return true if str == 'true'
+            return false if str == 'false'
+            return nil if str == 'nil'
+            date = DateTime.strptime(str, '%b %d, %Y') rescue nil
+            return date unless date.nil?
+            n = Float(str) rescue nil
+            return n if n && str.include?('.')
+            n = Integer(str) rescue nil
+            return n unless n.nil?
+            return str
+          end
+        end
+
+      end
+    end
+  end
+end

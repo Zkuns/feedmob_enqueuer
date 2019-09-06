@@ -1,0 +1,60 @@
+module Sidekiq
+  module Enqueuer
+    module Model
+      class Job
+        attr_accessor :job, :name, :params
+
+        def initialize(job_class)
+          @job = job_class
+          @name = job_class.name
+          @params = get_params
+        end
+
+        def perform_now request_params
+          @job.perform_later(2,3)
+          @job.perform_later(*parse_params(request_params))
+        end
+
+        def perform_in request_params, time_in_second
+          @job.set(wait: time_in_second).perform_later(*parse_params(request_params))
+        end
+
+        class << self
+          attr_accessor :jobs
+
+          def all_jobs
+            @jobs ||= ObjectSpace.each_object(Class).select { |k| k.superclass == ApplicationJob }.map {|j| Sidekiq::Enqueuer::Model::Job.new(j) }
+          end
+
+          def find_by_class_name name
+            all_jobs.each do |job|
+              return job if job.name == name
+            end
+            nil
+          end
+        end
+
+        private
+
+        def parse_params request_params
+          Param.check_params request_params, @params
+        end
+
+        def get_params
+          method_name = get_evaluate_name
+          job.instance_method(method_name).parameters.map do |method_data|
+            Param.new(method_data[1], method_data[0])
+          end
+        end
+
+        def get_evaluate_name
+          [:perform, :perform_in, :perform_async, :perform_at].each do |method_name|
+            return method_name if job.instance_methods.include?(method_name)
+          end
+          nil
+        end
+
+      end
+    end
+  end
+end
