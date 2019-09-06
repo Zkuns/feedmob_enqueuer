@@ -17,10 +17,10 @@ module Sidekiq
         app.post '/enqueuer' do
           job = Model::Job.find_by_class_name(params[:job_class_name])
           if job
-            if params['enqueue_in'].blank?
+            if params['wait_second'].blank?
               job.perform_now(params['perform'])
             else
-              job.perform_in(params['perform'], params['wait_second'])
+              job.perform_in(params['perform'], params['wait_second'].to_i)
             end
           end
           redirect "#{root_path}enqueuer"

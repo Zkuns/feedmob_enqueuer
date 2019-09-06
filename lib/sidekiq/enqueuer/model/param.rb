@@ -15,7 +15,7 @@ module Sidekiq
             params.map do |param|
               result = request_params[param.name.to_s] || ''
               result = convert_to_appropriate_datatype(result)
-              raise NoProvidedValueForRequiredParam if param.is_required && result.blank?
+              raise NoProvidedValueForRequiredParam if param.is_required && result.nil?
               results[param.name] = result
             end
           end
@@ -25,8 +25,7 @@ module Sidekiq
             return true if str == 'true'
             return false if str == 'false'
             return nil if str == 'nil'
-            date = DateTime.strptime(str, '%b %d, %Y') rescue nil
-            return date unless date.nil?
+            return nil if str.length == 0
             n = Float(str) rescue nil
             return n if n && str.include?('.')
             n = Integer(str) rescue nil

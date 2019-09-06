@@ -3,6 +3,11 @@ module Sidekiq
     module Model
       class Job
         attr_accessor :job, :name, :params
+        IGNORED_CLASSES = %w(Sidekiq::Extensions
+                           Sidekiq::Extensions::DelayedModel
+                           Sidekiq::Extensions::DelayedMailer
+                           Sidekiq::Extensions::DelayedClass
+                           ActiveJob::QueueAdapters).freeze
 
         def initialize(job_class)
           @job = job_class
@@ -11,7 +16,6 @@ module Sidekiq
         end
 
         def perform_now request_params
-          @job.perform_later(2,3)
           @job.perform_later(*parse_params(request_params))
         end
 
@@ -23,7 +27,11 @@ module Sidekiq
           attr_accessor :jobs
 
           def all_jobs
-            @jobs ||= ObjectSpace.each_object(Class).select { |k| k.superclass == ApplicationJob }.map {|j| Sidekiq::Enqueuer::Model::Job.new(j) }
+            return @jobs unless @jobs.blank?
+            @jobs = ObjectSpace.each_object(Class).select { |k| k.superclass == ::ActiveJob::Base }.map {|j| Sidekiq::Enqueuer::Model::Job.new(j) }
+            (@jobs = @jobs + ObjectSpace.each_object(Class).select { |k| k.superclass == ApplicationJob }) if (defined? ApplicationJob)
+            @jobs.delete_if { |j| IGNORED_CLASSES.include?(j.name) }
+            @jobs
           end
 
           def find_by_class_name name
